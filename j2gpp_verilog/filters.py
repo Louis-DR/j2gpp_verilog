@@ -422,3 +422,36 @@ def unpack_bus(bus_name, signals, signal_prefix="", signal_suffix="", signal_cas
         idx_base = f"{idx_base}+{signal_size}"
   return align('\n'.join(lines))
 extra_filters['unpack_bus'] = unpack_bus
+
+# Declare a list of wires
+def declare_wires(signals, signal_prefix="", signal_suffix="", signal_case=None):
+  if len(signals) == 0: return ""
+  lines = []
+  for signal_name, signal_size in signals.items():
+    signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+    line = f"wire {array_width(signal_size)} {signal_name};"
+    lines.append(line)
+  return autoformat_signal_definitions('\n'.join(lines))
+extra_filters['declare_wires'] = declare_wires
+
+# Declare a list of registers
+def declare_registers(signals, signal_prefix="", signal_suffix="", signal_case=None):
+  if len(signals) == 0: return ""
+  lines = []
+  for signal_name, signal_size in signals.items():
+    signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+    line = f"reg {array_width(signal_size)} {signal_name};"
+    lines.append(line)
+  return autoformat_signal_definitions('\n'.join(lines))
+extra_filters['declare_registers'] = declare_registers
+
+# Declare a list of logic signals/registers
+def declare_logic(signals, signal_prefix="", signal_suffix="", signal_case=None):
+  if len(signals) == 0: return ""
+  lines = []
+  for signal_name, signal_size in signals.items():
+    signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+    line = f"logic {array_width(signal_size)} {signal_name};"
+    lines.append(line)
+  return autoformat_signal_definitions('\n'.join(lines))
+extra_filters['declare_logic'] = declare_logic
