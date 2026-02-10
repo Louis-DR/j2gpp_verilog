@@ -161,6 +161,29 @@ def to_dec(value, width=None):
     return f"{width}'d{value}"
 extra_filters['to_dec'] = to_dec
 
+# Generate a bitmask of N ones as a Verilog literal
+def bitmask(width, hex=False):
+  width = int(width)
+  mask = (1 << width) - 1
+  if hex:
+    hex_digits = (width + 3) // 4
+    return f"{width}'h{mask:0{hex_digits}X}"
+  else:
+    return f"{width}'b{'1' * width}"
+extra_filters['bitmask'] = bitmask
+
+# Generate a one-hot encoded Verilog literal
+def onehot(index, width, hex=False):
+  index = int(index)
+  width = int(width)
+  value = 1 << index
+  if hex:
+    hex_digits = (width + 3) // 4
+    return f"{width}'h{value:0{hex_digits}X}"
+  else:
+    return f"{width}'b{value:0{width}b}"
+extra_filters['onehot'] = onehot
+
 
 # Invert the direction
 def invert(direction):
