@@ -304,3 +304,37 @@ def remove_duplicate_instance_ports(content, reverse=False):
     filtered_lines = filtered_lines[::-1]
   return '\n'.join(filtered_lines)
 extra_filters['remove_duplicate_instance_ports'] = remove_duplicate_instance_ports
+
+# Filter out listed ports from module port definition list
+def exclude_list_module_ports(content, excludeList=[]):
+  lines = content.split('\n')
+  filtered_lines = []
+  for line in lines:
+    line_strip = line.strip()
+    # If line is not blank and not commented
+    if line_strip and not line_strip.startswith('/'):
+      line_match = regex_portDefinition_noArray_noComma.match(line)
+      if line_match:
+        port_name = line_match.group('name')
+        if port_name in excludeList:
+          continue
+    filtered_lines.append(line)
+  return '\n'.join(filtered_lines)
+extra_filters['exclude_list_module_ports'] = exclude_list_module_ports
+
+# Filter out listed ports from instance port connection list
+def exclude_list_instance_ports(content, excludeList=[]):
+  lines = content.split('\n')
+  filtered_lines = []
+  for line in lines:
+    line_strip = line.strip()
+    # If line is not blank and not commented
+    if line_strip and not line_strip.startswith('/'):
+      line_match = regex_portConnection.match(line)
+      if line_match:
+        port_name = line_match.group('port_name')
+        if port_name in excludeList:
+          continue
+    filtered_lines.append(line)
+  return '\n'.join(filtered_lines)
+extra_filters['exclude_list_instance_ports'] = exclude_list_instance_ports
