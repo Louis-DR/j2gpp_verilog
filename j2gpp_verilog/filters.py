@@ -338,3 +338,26 @@ def exclude_list_instance_ports(content, excludeList=[]):
     filtered_lines.append(line)
   return '\n'.join(filtered_lines)
 extra_filters['exclude_list_instance_ports'] = exclude_list_instance_ports
+
+
+
+# ┌───────────────────┐
+# │ Signals and buses │
+# └───────────────────┘
+
+# Format a signal name
+def format_signal(signal_name, signal_prefix="", signal_suffix="", signal_case=None):
+  match signal_case:
+    case "lower":      signal_case = signal_case.lower()
+    case "upper":      signal_case = signal_case.upper()
+    case "title":      signal_case = signal_case.title()
+    case "capitalize": signal_case = signal_case.capitalize()
+    case "casefold":   signal_case = signal_case.casefold()
+    case "swapcase":   signal_case = signal_case.swapcase()
+    case "camel":      signal_case = camel  (signal_case)
+    case "pascal":     signal_case = pascal (signal_case)
+    case "snake":      signal_case = snake  (signal_case)
+    case "kebab":      signal_case = kebab  (signal_case)
+  signal_name = signal_prefix + signal_name + signal_suffix
+  return signal_name
+extra_filters['format_signal'] = format_signal
