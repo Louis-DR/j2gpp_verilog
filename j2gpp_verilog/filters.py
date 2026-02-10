@@ -249,3 +249,58 @@ def autoformat_parameter_list(content, indent=0):
     lines[idx] = line_func + line_comm
   return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
 extra_filters['autoformat_parameter_list'] = autoformat_parameter_list
+
+
+
+# ┌───────────────┐
+# │ Block filters │
+# └───────────────┘
+
+# Filter out duplicated ports from module port definition list
+def remove_duplicate_module_ports(content, reverse=False):
+  lines = content.split('\n')
+  if reverse:
+    lines = lines[::-1]
+  filtered_lines = []
+  ports_seen = set()
+  for line in lines:
+    line_strip = line.strip()
+    # If line is not blank and not commented
+    if line_strip and not line_strip.startswith('/'):
+      # Uses regex_portDefinition_noArray_noComma from previous context
+      line_match = regex_portDefinition_noArray_noComma.match(line)
+      if line_match:
+        port_name = line_match.group('name')
+        if port_name in ports_seen:
+          continue
+        else:
+          ports_seen.add(port_name)
+    filtered_lines.append(line)
+  if reverse:
+    filtered_lines = filtered_lines[::-1]
+  return '\n'.join(filtered_lines)
+extra_filters['remove_duplicate_module_ports'] = remove_duplicate_module_ports
+
+# Filter out duplicated ports from instance port connection list
+def remove_duplicate_instance_ports(content, reverse=False):
+  lines = content.split('\n')
+  if reverse:
+    lines = lines[::-1]
+  filtered_lines = []
+  ports_seen = set()
+  for line in lines:
+    line_strip = line.strip()
+    # If line is not blank and not commented
+    if line_strip and not line_strip.startswith('/'):
+      line_match = regex_portConnection.match(line)
+      if line_match:
+        port_name = line_match.group('port_name')
+        if port_name in ports_seen:
+          continue
+        else:
+          ports_seen.add(port_name)
+    filtered_lines.append(line)
+  if reverse:
+    filtered_lines = filtered_lines[::-1]
+  return '\n'.join(filtered_lines)
+extra_filters['remove_duplicate_instance_ports'] = remove_duplicate_instance_ports
