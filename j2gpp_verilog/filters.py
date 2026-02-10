@@ -570,3 +570,31 @@ def declare_localparams(params):
   return align('\n'.join(lines))
 extra_filters['declare_localparams'] = declare_localparams
 
+# Generate a module instantiation
+def instantiate(module_name, ports, instance_name=None, params=None, indent=2):
+  if instance_name is None:
+    instance_name = f"i_{module_name}"
+  lines = []
+  ind = " " * indent
+  if params:
+    lines.append(f"{module_name} #(")
+    param_lines = []
+    for pname, pvalue in params.items():
+      param_lines.append(f"{ind}.{pname} ({pvalue})")
+    for i, pline in enumerate(param_lines):
+      comma = "," if i < len(param_lines) - 1 else ""
+      lines.append(pline + comma)
+    lines.append(f") {instance_name} (")
+  else:
+    lines.append(f"{module_name} {instance_name} (")
+  port_lines = []
+  for pname, connection in ports.items():
+    port_lines.append(f"{ind}.{pname} ({connection})")
+  for i, pline in enumerate(port_lines):
+    comma = "," if i < len(port_lines) - 1 else ""
+    lines.append(pline + comma)
+  lines.append(");")
+  return autoformat_instance_ports('\n'.join(lines), indent)
+extra_filters['instantiate'] = instantiate
+
+
