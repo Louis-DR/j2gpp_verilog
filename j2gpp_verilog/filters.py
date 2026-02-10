@@ -24,6 +24,7 @@ extra_filters = {}
 # │ Basic filters │
 # └───────────────┘
 
+# Log2 rounded up for bus width calculation
 extra_filters['clog2'] = lambda x : ceil(log2(x))
 
 # Vector or array declaration size
@@ -45,3 +46,19 @@ def array_width(width, str_len=0):
     else: return f"[{width-1}:0]".rjust(str_len)
 extra_filters['array_width'] = array_width
 extra_filters['arr']         = array_width # Alias
+
+# Invert the direction
+def invert(direction):
+  if   direction=="input":  return "output"
+  elif direction=="output": return "input"
+  elif direction=="inout":  return "inout"
+  else:
+    throw_error(f"Invalid direction '{direction}' for filter 'invert'.")
+    return direction
+extra_filters['invert'] = invert
+
+# Invert the direction if condition is true
+def invert_if(direction, condition):
+  if condition: return invert(direction)
+  else: return direction
+extra_filters['invert_if'] = invert_if
