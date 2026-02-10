@@ -622,3 +622,22 @@ def instantiate(module_name, ports, instance_name=None, params=None, indent=2):
 extra_filters['instantiate'] = instantiate
 
 
+
+# ┌──────────────────────┐
+# │ Preprocessor helpers │
+# └──────────────────────┘
+
+# Wrap content in `ifdef / `endif preprocessor guards
+def wrap_ifdef(content, macro):
+  return f"`ifdef {macro}\n{content}\n`endif // {macro}"
+extra_filters['wrap_ifdef'] = wrap_ifdef
+
+# Wrap content in `ifndef / `define / `endif include guards
+def include_guard(content, name):
+  guard = name.upper().replace(".", "_").replace(" ", "_")
+  if not guard.startswith("_"):
+    guard = f"__{guard}__"
+  else:
+    guard = f"{guard}__"
+  return f"`ifndef {guard}\n`define {guard}\n{content}\n`endif // {guard}"
+extra_filters['include_guard'] = include_guard
