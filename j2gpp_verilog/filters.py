@@ -549,3 +549,24 @@ def declare_logic(signals, signal_prefix="", signal_suffix="", signal_case=None)
     lines.append(line)
   return autoformat_signal_definitions('\n'.join(lines))
 extra_filters['declare_logic'] = declare_logic
+
+# Declare a list of parameters
+def declare_parameters(params):
+  if len(params) == 0: return ""
+  lines = []
+  for param_name, param_value in params.items():
+    line = f"parameter {param_name} § = § {param_value};"
+    lines.append(line)
+  return align('\n'.join(lines))
+extra_filters['declare_parameters'] = declare_parameters
+
+# Declare a list of localparams
+def declare_localparams(params):
+  if len(params) == 0: return ""
+  lines = []
+  for param_name, param_value in params.items():
+    line = f"localparam {param_name} § = § {param_value};"
+    lines.append(line)
+  return align('\n'.join(lines))
+extra_filters['declare_localparams'] = declare_localparams
+
