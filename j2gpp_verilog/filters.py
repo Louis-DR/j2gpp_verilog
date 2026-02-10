@@ -184,6 +184,30 @@ def onehot(index, width, hex=False):
     return f"{width}'b{value:0{width}b}"
 extra_filters['onehot'] = onehot
 
+# Generate one-hot decoder assign statements
+def onehot_decode(signal, num_bits):
+  num_bits = int(num_bits)
+  num_outputs = 1 << num_bits
+  lines = []
+  for i in range(num_outputs):
+    lines.append(f"assign decoded[{i}] § = ({signal} == {to_dec(i, num_bits)});")
+  return align('\n'.join(lines))
+extra_filters['onehot_decode'] = onehot_decode
+
+# Generate priority encoder as nested ternary expression
+def priority_encode(signals):
+  if not signals:
+    return "'0"
+  if len(signals) == 1:
+    name, value = next(iter(signals.items()))
+    return value
+  items = list(signals.items())
+  expr = items[-1][1]
+  for name, value in reversed(items[:-1]):
+    expr = f"{name} ? {value} : ({expr})"
+  return expr
+extra_filters['priority_encode'] = priority_encode
+
 # Generate bit-reversal concatenation expression
 def bit_reverse(signal, width):
   width = int(width)
