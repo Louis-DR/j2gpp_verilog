@@ -184,6 +184,45 @@ def onehot(index, width, hex=False):
     return f"{width}'b{value:0{width}b}"
 extra_filters['onehot'] = onehot
 
+# Generate bit-reversal concatenation expression
+def bit_reverse(signal, width):
+  width = int(width)
+  bits = [f"{signal}[{i}]" for i in range(width)]
+  return "{" + ", ".join(bits) + "}"
+extra_filters['bit_reverse'] = bit_reverse
+
+# Generate nibble swap concatenation expression (4-bit granularity)
+def nibble_swap(signal, num_nibbles):
+  num_nibbles = int(num_nibbles)
+  slices = []
+  for i in range(num_nibbles):
+    lsb = i * 4
+    msb = lsb + 3
+    slices.append(f"{signal}[{msb}:{lsb}]")
+  return "{" + ", ".join(slices) + "}"
+extra_filters['nibble_swap'] = nibble_swap
+
+# Generate endianness swap concatenation expression (8-bit granularity)
+def byte_swap(signal, num_bytes):
+  num_bytes = int(num_bytes)
+  slices = []
+  for i in range(num_bytes):
+    lsb = i * 8
+    msb = lsb + 7
+    slices.append(f"{signal}[{msb}:{lsb}]")
+  return "{" + ", ".join(slices) + "}"
+extra_filters['byte_swap'] = byte_swap
+
+# Generate word swap concatenation expression (16-bit granularity)
+def word_swap(signal, num_words):
+  num_words = int(num_words)
+  slices = []
+  for i in range(num_words):
+    lsb = i * 16
+    msb = lsb + 15
+    slices.append(f"{signal}[{msb}:{lsb}]")
+  return "{" + ", ".join(slices) + "}"
+extra_filters['word_swap'] = word_swap
 
 # Invert the direction
 def invert(direction):
