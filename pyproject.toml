@@ -4,11 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "j2gpp-verilog"
-version = "0.1.0"
+version = "1.0.0"
 description = "J2GPP extension for Verilog and SystemVerilog"
 readme = "README.md"
 requires-python = ">=3.8"
-keywords = ["j2gpp", "jinja2", "extension", "verilog", "systemverilog", "rtl", "hdl", "asic", "fpga"]
+keywords = [
+  "j2gpp",
+  "jinja2",
+  "extension",
+  "verilog",
+  "systemverilog",
+  "rtl",
+  "hdl",
+  "asic",
+  "fpga",
+]
 authors = [{ name = "Louis Duret-Robert", email = "louisduret@gmail.com" }]
 classifiers = [
   "Programming Language :: Python :: 3",
