@@ -62,3 +62,20 @@ def invert_if(direction, condition):
   if condition: return invert(direction)
   else: return direction
 extra_filters['invert_if'] = invert_if
+
+
+
+# ┌──────────────┐
+# │ Block format │
+# └──────────────┘
+
+# Remove the comma at the end of the last non-commented non-empty line
+def remove_last_comma(content):
+  lines = content.split('\n')
+  for idx, line in reversed(list(enumerate(lines))):
+    line_strip = line.lstrip()
+    if line_strip and line_strip[0] != '/':
+      lines[idx] = line.replace(',', '', 1)
+      break
+  return '\n'.join(lines)
+extra_filters['remove_last_comma'] = remove_last_comma
