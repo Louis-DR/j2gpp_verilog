@@ -1,0 +1,9 @@
+/.history
+/.vscode
+/.ipynb_checkpoints
+j2gpp_verilog/__pycache__/
+j2gpp_verilog.egg-info/
+/build
+/dist
+/test
+/TODO
