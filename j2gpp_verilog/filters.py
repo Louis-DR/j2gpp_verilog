@@ -130,6 +130,38 @@ def array_width(width, str_len=0):
 extra_filters['array_width'] = array_width
 extra_filters['arr']         = array_width # Alias
 
+# Convert integer to Verilog hex literal
+def to_hex(value, width=None):
+  value = int(value)
+  if width is None:
+    return f"'h{value:X}"
+  else:
+    width = int(width)
+    hex_digits = (width + 3) // 4
+    return f"{width}'h{value:0{hex_digits}X}"
+extra_filters['to_hex'] = to_hex
+
+# Convert integer to Verilog binary literal
+def to_bin(value, width=None):
+  value = int(value)
+  if width is None:
+    return f"'b{value:b}"
+  else:
+    width = int(width)
+    return f"{width}'b{value:0{width}b}"
+extra_filters['to_bin'] = to_bin
+
+# Convert integer to Verilog decimal literal
+def to_dec(value, width=None):
+  value = int(value)
+  if width is None:
+    return f"'d{value}"
+  else:
+    width = int(width)
+    return f"{width}'d{value}"
+extra_filters['to_dec'] = to_dec
+
+
 # Invert the direction
 def invert(direction):
   if   direction=="input":  return "output"
