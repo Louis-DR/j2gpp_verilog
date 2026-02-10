@@ -14,7 +14,7 @@
 import re
 from math import ceil, log2
 from j2gpp.utils import throw_error
-from j2gpp.filters import align
+from j2gpp.filters import align, camel, pascal, snake, kebab
 from jinja2.filters import do_indent
 
 
@@ -361,3 +361,64 @@ def format_signal(signal_name, signal_prefix="", signal_suffix="", signal_case=N
   signal_name = signal_prefix + signal_name + signal_suffix
   return signal_name
 extra_filters['format_signal'] = format_signal
+
+# Assign block to pack a list of signals into a vector signal
+def pack_bus(bus_name, signals, signal_prefix="", signal_suffix="", signal_case=None):
+  if len(signals) == 0: return ""
+  lines = []
+  all_sizes_are_numbers = all(isinstance(value, (int,float)) for value in signals.values())
+  if all_sizes_are_numbers:
+    idx_start = 0
+    idx_end   = 0
+    for signal_name, signal_size in signals.items():
+      signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+      signal_size = int(signal_size)
+      idx_end     = idx_start + signal_size
+      if signal_size == 1:
+        line = f"assign {bus_name} [§ §§ § {idx_start} §§ ] = {signal_name};"
+      else:
+        line = f"assign {bus_name} [§ {idx_end} §§ : §{idx_start} §§ ] = {signal_name};"
+      lines.append(line)
+      idx_start = idx_end
+  else:
+    idx_base = "0"
+    for signal_name, signal_size in signals.items():
+      signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+      line = f"assign {bus_name} [§ {idx_base} § +: §{signal_size} §§ ] = {signal_name};"
+      lines.append(line)
+      if idx_base == "0":
+        idx_base = str(signal_size)
+      else:
+        idx_base = f"{idx_base}+{signal_size}"
+  return align('\n'.join(lines))
+extra_filters['pack_bus'] = pack_bus
+
+def unpack_bus(bus_name, signals, signal_prefix="", signal_suffix="", signal_case=None):
+  if len(signals) == 0: return ""
+  lines = []
+  all_sizes_are_numbers = all(isinstance(value, (int,float)) for value in signals.values())
+  if all_sizes_are_numbers:
+    idx_start = 0
+    idx_end   = 0
+    for signal_name, signal_size in signals.items():
+      signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+      signal_size = int(signal_size)
+      idx_end     = idx_start + signal_size
+      if signal_size == 1:
+        line = f"assign {signal_name} § = {bus_name} [§ §§ § {idx_start} §§ ];"
+      else:
+        line = f"assign {signal_name} § = {bus_name} [§ {idx_end} §§ : §{idx_start} §§ ];"
+      lines.append(line)
+      idx_start = idx_end
+  else:
+    idx_base = "0"
+    for signal_name, signal_size in signals.items():
+      signal_name = format_signal(signal_name, signal_prefix, signal_suffix, signal_case)
+      line = f"assign {signal_name} § = {bus_name} [§ {idx_base} § +: §{signal_size} §§ ];"
+      lines.append(line)
+      if idx_base == "0":
+        idx_base = str(signal_size)
+      else:
+        idx_base = f"{idx_base}+{signal_size}"
+  return align('\n'.join(lines))
+extra_filters['unpack_bus'] = unpack_bus
