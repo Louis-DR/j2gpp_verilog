@@ -30,15 +30,15 @@ extra_filters = {}
 # Module Port Definition (stopping after name)
 # Matches: "input wire [7:0] name" or "output reg name"
 regex_portDefinition_noArray_noComma = re.compile(r"""
-  ^\s*
-  (?P<dir>input|output|inout)               # Direction
-  (?:\s+(?P<type>[a-zA-Z_]\w*))?            # Optional net type (wire/reg/logic)
+  ^(?P<indent>\s*)
+  (?:(?P<dir>input|output|inout|ref)\b\s*)? # Optional Direction
+  (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*)? # Optional type (net, interface, struct, etc.)
+  \s*
   (?:
-    \s+
     (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\]) # Optional packed dimension [MSB:LSB]
+    \s*
   )?
-  \s+
-  (?P<name>[a-zA-Z_]\w*)                    # Port name
+  \b(?P<name>[a-zA-Z_]\w*)                    # Port name
 """, re.VERBOSE)
 
 # Instance Port Connection
@@ -49,8 +49,7 @@ regex_portConnection = re.compile(r"""
   \s*
   \(
   \s*
-  (?P<connection>[^)]*)                     # Connection expression
-  \s*
+  (?P<connection>.*)                        # Connection expression
   \)
   \s*
   ,?                                        # Optional comma
@@ -59,20 +58,20 @@ regex_portConnection = re.compile(r"""
 # Wire/Signal Definition (stopping after name)
 # Matches: "wire [7:0] name" or "logic name"
 regex_wireDefinition_noArray_noComma = re.compile(r"""
-  ^\s*
-  (?P<type>wire|logic|reg|bit|int)          # Signal type
+  ^(?P<indent>\s*)
+  (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*) # Signal type
+  \s*
   (?:
-    \s+
     (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\]) # Optional packed dim [MSB:LSB]
+    \s*
   )?
-  \s+
-  (?P<name>[a-zA-Z_]\w*)                    # Signal name
+  \b(?P<name>[a-zA-Z_]\w*)                    # Signal name
 """, re.VERBOSE)
 
 # Assign Statement
 # Matches: "assign x = y;"
 regex_assignStatement = re.compile(r"""
-  ^\s*
+  ^(?P<indent>\s*)
   assign\s+
   (?P<lhs>[^=]*[^=\s])                      # Left-hand side
   \s*=\s*
@@ -83,7 +82,7 @@ regex_assignStatement = re.compile(r"""
 # Parameter Definition
 # Matches: "parameter type [p:p] name [u:u] = value;"
 regex_parameterDefinition = re.compile(r"""
-  ^\s*
+  ^(?P<indent>\s*)
   (?P<keyword>parameter|localparam|specparam)
   \s+
   (?:                                       # Optional type block
@@ -98,7 +97,8 @@ regex_parameterDefinition = re.compile(r"""
   \s*
   (?:=\s*(?P<value>.*?))?                   # Optional value (lazy)
   \s*
-  (?P<terminator>[,;])                      # Terminator
+  (?P<terminator>[,;])?                     # Terminator
+  \s*$
 """, re.VERBOSE)
 
 
@@ -311,88 +311,115 @@ extra_filters['remove_last_comma'] = remove_last_comma
 def autoformat_module_ports(content, indent=2):
   lines = content.split('\n')
   for idx, line in enumerate(lines):
-    line_strip = line.strip()
-    if line_strip and line_strip.startswith('/'):
-      lines[idx] = line_strip
+    if line.lstrip().startswith('/'):
       continue
-    line_split = line_strip.split('//', 1)
-    line_func = line_split[0]
+    line_split = line.split('//', 1)
+    line_func = line_split[0].rstrip()
+    if not line_func:
+      continue
     line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = regex_portDefinition_noArray_noComma.sub(
-      r"\g<dir> § \g<type> § \g<packed> §§ \g<name>",
-      line_func
-    )
+    line_match = regex_portDefinition_noArray_noComma.match(line_func)
+    if line_match:
+      indent_val = line_match.group('indent') or ""
+      dir_val = line_match.group('dir')
+      type_val = line_match.group('type') or ""
+      packed_val = line_match.group('packed') or ""
+      name_val = line_match.group('name')
+
+      if not dir_val:
+        dir_val = type_val
+        type_val = ""
+
+      line_func = f"{indent_val}{dir_val} § {type_val} § {packed_val} §§ {name_val}"
     lines[idx] = line_func + line_comm
-  return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
+  return align('\n'.join(lines))
 extra_filters['autoformat_module_ports'] = autoformat_module_ports
 
 def autoformat_instance_ports(content, indent=2):
   lines = content.split('\n')
   for idx, line in enumerate(lines):
-    line_strip = line.strip()
-    if line_strip and line_strip.startswith('/'):
-      lines[idx] = line_strip
+    if line.lstrip().startswith('/'):
       continue
-    line_split = line_strip.split('//', 1)
-    line_func = line_split[0]
+    line_split = line.split('//', 1)
+    line_func = line_split[0].rstrip()
+    if not line_func:
+      continue
     line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = line_func.replace('(', '§(§', 1).replace(')', ' §)', 1)
+    line_func = line_func.replace('(', '§(§', 1)
+    last_paren = line_func.rfind(')')
+    if last_paren != -1:
+      line_func = line_func[:last_paren] + ' §)' + line_func[last_paren+1:]
     lines[idx] = line_func + line_comm
-  return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
+  return align('\n'.join(lines))
 extra_filters['autoformat_instance_ports'] = autoformat_instance_ports
 
 def autoformat_signal_definitions(content, indent=0):
   lines = content.split('\n')
   for idx, line in enumerate(lines):
-    line_strip = line.strip()
-    if line_strip and line_strip.startswith('/'):
-      lines[idx] = line_strip
+    if line.lstrip().startswith('/'):
       continue
-    line_split = line_strip.split('//', 1)
-    line_func = line_split[0]
+    line_split = line.split('//', 1)
+    line_func = line_split[0].rstrip()
+    if not line_func:
+      continue
     line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = regex_wireDefinition_noArray_noComma.sub(
-      r"\g<type> § \g<packed> §§ \g<name>",
-      line_func
-    )
+    line_match = regex_wireDefinition_noArray_noComma.match(line_func)
+    if line_match:
+      indent_val = line_match.group('indent') or ""
+      type_val = line_match.group('type') or ""
+      packed_val = line_match.group('packed') or ""
+      name_val = line_match.group('name')
+
+      line_func = f"{indent_val}{type_val} § {packed_val} §§ {name_val}"
     lines[idx] = line_func + line_comm
-  return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
+  return align('\n'.join(lines))
 extra_filters['autoformat_signal_definitions'] = autoformat_signal_definitions
 
 def autoformat_assign_statements(content, indent=0):
   lines = content.split('\n')
   for idx, line in enumerate(lines):
-    line_strip = line.strip()
-    if line_strip and line_strip.startswith('/'):
-      lines[idx] = line_strip
+    if line.lstrip().startswith('/'):
       continue
-    line_split = line_strip.split('//', 1)
-    line_func = line_split[0]
+    line_split = line.split('//', 1)
+    line_func = line_split[0].rstrip()
+    if not line_func:
+      continue
     line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = regex_assignStatement.sub(
-      r"assign \g<lhs> § = § \g<rhs>;",
-      line_func
-    )
+    line_match = regex_assignStatement.match(line_func)
+    if line_match:
+      indent_val = line_match.group('indent') or ""
+      lhs_val = line_match.group('lhs') or ""
+      rhs_val = line_match.group('rhs') or ""
+
+      line_func = f"{indent_val}assign {lhs_val} § = § {rhs_val};"
     lines[idx] = line_func + line_comm
-  return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
+  return align('\n'.join(lines))
 extra_filters['autoformat_assign_statements'] = autoformat_assign_statements
 
 def autoformat_parameter_list(content, indent=0):
   lines = content.split('\n')
   for idx, line in enumerate(lines):
-    line_strip = line.strip()
-    if line_strip and line_strip.startswith('/'):
-      lines[idx] = line_strip
+    if line.lstrip().startswith('/'):
       continue
-    line_split = line_strip.split('//', 1)
-    line_func = line_split[0]
+    line_split = line.split('//', 1)
+    line_func = line_split[0].rstrip()
+    if not line_func:
+      continue
     line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = regex_parameterDefinition.sub(
-      r"\g<keyword> § \g<type> § \g<packed> §§ \g<name>\g<unpacked> § = § \g<value>\g<terminator>",
-      line_func
-    )
+    line_match = regex_parameterDefinition.match(line_func)
+    if line_match:
+      indent_val = line_match.group('indent') or ""
+      keyword_val = line_match.group('keyword')
+      type_val = line_match.group('type') or ""
+      packed_val = line_match.group('packed') or ""
+      name_val = line_match.group('name')
+      unpacked_val = line_match.group('unpacked') or ""
+      value_val = line_match.group('value') or ""
+      terminator_val = line_match.group('terminator') or ""
+
+      line_func = f"{indent_val}{keyword_val} § {type_val} § {packed_val} §§ {name_val}{unpacked_val} § = § {value_val}{terminator_val}"
     lines[idx] = line_func + line_comm
-  return do_indent(align('\n'.join(lines)), indent, True).strip('\n')
+  return align('\n'.join(lines))
 extra_filters['autoformat_parameter_list'] = autoformat_parameter_list
 
 
