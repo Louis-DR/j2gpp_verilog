@@ -264,6 +264,33 @@ def invert_if(direction, condition):
   else: return direction
 extra_filters['invert_if'] = invert_if
 
+# Invert all directions in a block
+def invert_all(content, keep_alignment=False):
+  if keep_alignment:
+    content = re.sub(r'\boutput\b', '\x00INPUT_ALIGNED\x00', content)
+    content = re.sub(r'\binput\b\s(?=\s)', '\x00OUTPUT_ALIGNED\x00', content)
+    content = re.sub(r'\binput\b', '\x00OUTPUT\x00', content)
+
+    content = content.replace('\x00INPUT_ALIGNED\x00', 'input ')
+    content = content.replace('\x00OUTPUT_ALIGNED\x00', 'output')
+    content = content.replace('\x00OUTPUT\x00', 'output')
+  else:
+    content = re.sub(r'\boutput\b', '\x00INPUT\x00', content)
+    content = re.sub(r'\binput\b', '\x00OUTPUT\x00', content)
+
+    content = content.replace('\x00INPUT\x00', 'input')
+    content = content.replace('\x00OUTPUT\x00', 'output')
+  return content
+extra_filters['invert_all'] = invert_all
+
+# Invert all directions in a block if condition is true
+def invert_all_if(content, condition, keep_alignment=False):
+  if condition:
+    return invert_all(content, keep_alignment)
+  else:
+    return content
+extra_filters['invert_all_if'] = invert_all_if
+
 
 
 # ┌──────────────┐
