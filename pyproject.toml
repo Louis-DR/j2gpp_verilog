@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "j2gpp-verilog"
-version = "1.0.0"
+version = "1.1.0"
 description = "J2GPP extension for Verilog and SystemVerilog"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -26,7 +26,7 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
 ]
 
-dependencies = ["j2gpp>=4.0.0"]
+dependencies = ["j2gpp>=4.3.0"]
 
 [project.urls]
 "Homepage" = "https://github.com/Louis-DR/j2gpp_verilog"
