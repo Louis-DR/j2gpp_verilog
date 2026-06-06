@@ -392,7 +392,7 @@ def autoformat_assign_statements(content, indent=0):
   return align('\n'.join(lines))
 extra_filters['autoformat_assign_statements'] = autoformat_assign_statements
 
-def autoformat_parameter_list(content, indent=0):
+def autoformat_parameter_list(content, indent=0, right_align_values=False):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
@@ -413,6 +413,7 @@ def autoformat_parameter_list(content, indent=0):
       value       = line_match.group('value')       or ""
       termination = line_match.group('termination') or ""
       line_code = f"{indentation}{keyword} § {signal_type} § {packing} §§ {signal_name}{unpacking} § = § {value}{termination}"
+      if right_align_values: line_code += "§§"
     lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_parameter_list'] = autoformat_parameter_list
