@@ -31,28 +31,28 @@ extra_filters = {}
 # Matches: "input wire [7:0] name" or "output reg name"
 regex_portDefinition_noArray_noComma = re.compile(r"""
   ^(?P<indent>\s*)
-  (?:(?P<dir>input|output|inout|ref)\b\s*)? # Optional Direction
-  (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*)? # Optional type (net, interface, struct, etc.)
+  (?:(?P<dir>input|output|inout|ref)\b\s*)?  # Optional Direction
+  (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*)?  # Optional type (net, interface, struct, etc.)
   \s*
   (?:
-    (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\]) # Optional packed dimension [MSB:LSB]
+    (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\])  # Optional packed dimension [MSB:LSB]
     \s*
   )?
-  \b(?P<name>[a-zA-Z_]\w*)                    # Port name
+  \b(?P<name>[a-zA-Z_]\w*)                   # Port name
 """, re.VERBOSE)
 
 # Instance Port Connection
 # Matches: ".port_name ( connection_expression ),"
 regex_portConnection = re.compile(r"""
   ^\s*
-  \.(?P<port_name>[a-zA-Z_]\w*)             # Port name
+  \.(?P<port_name>[a-zA-Z_]\w*)  # Port name
   \s*
   \(
   \s*
-  (?P<connection>.*)                        # Connection expression
+  (?P<connection>.*)             # Connection expression
   \)
   \s*
-  ,?                                        # Optional comma
+  ,?                             # Optional comma
 """, re.VERBOSE)
 
 # Wire/Signal Definition (stopping after name)
@@ -62,10 +62,10 @@ regex_wireDefinition_noArray_noComma = re.compile(r"""
   (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*) # Signal type
   \s*
   (?:
-    (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\]) # Optional packed dim [MSB:LSB]
+    (?P<packed>\[\s*[^:]*\s*:\s*[^:]*\s*\])  # Optional packed dim [MSB:LSB]
     \s*
   )?
-  \b(?P<name>[a-zA-Z_]\w*)                    # Signal name
+  \b(?P<name>[a-zA-Z_]\w*)                   # Signal name
 """, re.VERBOSE)
 
 # Assign Statement
@@ -73,9 +73,9 @@ regex_wireDefinition_noArray_noComma = re.compile(r"""
 regex_assignStatement = re.compile(r"""
   ^(?P<indent>\s*)
   assign\s+
-  (?P<lhs>[^=]*[^=\s])                      # Left-hand side
+  (?P<assign_left>[^=]*[^=\s])   # Left-hand side
   \s*=\s*
-  (?P<rhs>[^;]*[^;\s])                      # Right-hand side
+  (?P<assign_right>[^;]*[^;\s])  # Right-hand side
   \s*;
 """, re.VERBOSE)
 
@@ -85,19 +85,19 @@ regex_parameterDefinition = re.compile(r"""
   ^(?P<indent>\s*)
   (?P<keyword>parameter|localparam|specparam)
   \s+
-  (?:                                       # Optional type block
-    (?P<type>(?:(?!\[).)*?)                 # Type: match until first bracket (lazy)
+  (?:                                # Optional type block
+    (?P<type>(?:(?!\[).)*?)          # Type: match until first bracket (lazy)
     \s*
-    (?P<packed>(?:\[[^\]]*\]\s*)+)?         # Packed: one or more [ ... ]
+    (?P<packed>(?:\[[^\]]*\]\s*)+)?  # Packed: one or more [ ... ]
   )?
   \s*
-  (?P<name>[a-zA-Z_]\w*)                    # Parameter name
+  (?P<name>[a-zA-Z_]\w*)             # Parameter name
   \s*
-  (?P<unpacked>(?:\[[^\]]*\]\s*)*)?         # Unpacked: zero or more [ ... ]
+  (?P<unpacked>(?:\[[^\]]*\]\s*)*)?  # Unpacked: zero or more [ ... ]
   \s*
-  (?:=\s*(?P<value>.*?))?                   # Optional value (lazy)
+  (?:=\s*(?P<value>.*?))?            # Optional value (lazy)
   \s*
-  (?P<terminator>[,;])?                     # Terminator
+  (?P<termination>[,;])?             # Termination
   \s*$
 """, re.VERBOSE)
 
@@ -300,125 +300,120 @@ extra_filters['invert_all_if'] = invert_all_if
 # Remove the comma at the end of the last non-commented non-empty line
 def remove_last_comma(content):
   lines = content.split('\n')
-  for idx, line in reversed(list(enumerate(lines))):
-    line_strip = line.lstrip()
-    if line_strip and line_strip[0] != '/':
-      lines[idx] = line.replace(',', '', 1)
+  for line_index, line in reversed(list(enumerate(lines))):
+    stripped_line = line.lstrip()
+    if stripped_line and stripped_line[0] != '/':
+      lines[line_index] = line.replace(',', '', 1)
       break
   return '\n'.join(lines)
 extra_filters['remove_last_comma'] = remove_last_comma
 
 def autoformat_module_ports(content, indent=2):
   lines = content.split('\n')
-  for idx, line in enumerate(lines):
+  for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
       continue
     line_split = line.split('//', 1)
-    line_func = line_split[0].rstrip()
-    if not line_func:
+    line_code  = line_split[0].rstrip()
+    if not line_code:
       continue
-    line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_match = regex_portDefinition_noArray_noComma.match(line_func)
+    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
+    line_match   = regex_portDefinition_noArray_noComma.match(line_code)
     if line_match:
-      indent_val = line_match.group('indent') or ""
-      dir_val = line_match.group('dir')
-      type_val = line_match.group('type') or ""
-      packed_val = line_match.group('packed') or ""
-      name_val = line_match.group('name')
-
-      if not dir_val:
-        dir_val = type_val
-        type_val = ""
-
-      line_func = f"{indent_val}{dir_val} § {type_val} § {packed_val} §§ {name_val}"
-    lines[idx] = line_func + line_comm
+      indentation = line_match.group('indent') or ""
+      direction   = line_match.group('dir')
+      signal_type = line_match.group('type')   or ""
+      packing     = line_match.group('packed') or ""
+      signal_name = line_match.group('name')
+      if not direction:
+        direction = signal_type
+        signal_type = ""
+      line_code = f"{indentation}{direction} § {signal_type} § {packing} §§ {signal_name}{line_code[line_match.end('name'):]}"
+    lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_module_ports'] = autoformat_module_ports
 
 def autoformat_instance_ports(content, indent=2):
   lines = content.split('\n')
-  for idx, line in enumerate(lines):
+  for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
       continue
     line_split = line.split('//', 1)
-    line_func = line_split[0].rstrip()
-    if not line_func:
+    line_code  = line_split[0].rstrip()
+    if not line_code:
       continue
-    line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_func = line_func.replace('(', '§(§', 1)
-    last_paren = line_func.rfind(')')
-    if last_paren != -1:
-      line_func = line_func[:last_paren] + ' §)' + line_func[last_paren+1:]
-    lines[idx] = line_func + line_comm
+    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
+    line_code = line_code.replace('(', '§(§', 1)
+    closing_paren_index = line_code.rfind(')')
+    if closing_paren_index != -1:
+      line_code = line_code[:closing_paren_index] + ' §)' + line_code[closing_paren_index+1:]
+    lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_instance_ports'] = autoformat_instance_ports
 
 def autoformat_signal_definitions(content, indent=0):
   lines = content.split('\n')
-  for idx, line in enumerate(lines):
+  for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
       continue
     line_split = line.split('//', 1)
-    line_func = line_split[0].rstrip()
-    if not line_func:
+    line_code = line_split[0].rstrip()
+    if not line_code:
       continue
-    line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_match = regex_wireDefinition_noArray_noComma.match(line_func)
+    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
+    line_match = regex_wireDefinition_noArray_noComma.match(line_code)
     if line_match:
-      indent_val = line_match.group('indent') or ""
-      type_val = line_match.group('type') or ""
-      packed_val = line_match.group('packed') or ""
-      name_val = line_match.group('name')
-
-      line_func = f"{indent_val}{type_val} § {packed_val} §§ {name_val}"
-    lines[idx] = line_func + line_comm
+      indentation = line_match.group('indent') or ""
+      signal_type = line_match.group('type')   or ""
+      packing     = line_match.group('packed') or ""
+      signal_name = line_match.group('name')
+      line_code = f"{indentation}{signal_type} § {packing} §§ {signal_name}{line_code[line_match.end('name'):]}"
+    lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_signal_definitions'] = autoformat_signal_definitions
 
 def autoformat_assign_statements(content, indent=0):
   lines = content.split('\n')
-  for idx, line in enumerate(lines):
+  for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
       continue
     line_split = line.split('//', 1)
-    line_func = line_split[0].rstrip()
-    if not line_func:
+    line_code = line_split[0].rstrip()
+    if not line_code:
       continue
-    line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_match = regex_assignStatement.match(line_func)
+    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
+    line_match = regex_assignStatement.match(line_code)
     if line_match:
-      indent_val = line_match.group('indent') or ""
-      lhs_val = line_match.group('lhs') or ""
-      rhs_val = line_match.group('rhs') or ""
-
-      line_func = f"{indent_val}assign {lhs_val} § = § {rhs_val};"
-    lines[idx] = line_func + line_comm
+      indentation  = line_match.group('indent')       or ""
+      assign_left  = line_match.group('assign_left')  or ""
+      assign_right = line_match.group('assign_right') or ""
+      line_code = f"{indentation}assign {assign_left} § = § {assign_right};"
+    lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_assign_statements'] = autoformat_assign_statements
 
 def autoformat_parameter_list(content, indent=0):
   lines = content.split('\n')
-  for idx, line in enumerate(lines):
+  for line_index, line in enumerate(lines):
     if line.lstrip().startswith('/'):
       continue
     line_split = line.split('//', 1)
-    line_func = line_split[0].rstrip()
-    if not line_func:
+    line_code = line_split[0].rstrip()
+    if not line_code:
       continue
-    line_comm = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_match = regex_parameterDefinition.match(line_func)
+    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
+    line_match = regex_parameterDefinition.match(line_code)
     if line_match:
-      indent_val = line_match.group('indent') or ""
-      keyword_val = line_match.group('keyword')
-      type_val = line_match.group('type') or ""
-      packed_val = line_match.group('packed') or ""
-      name_val = line_match.group('name')
-      unpacked_val = line_match.group('unpacked') or ""
-      value_val = line_match.group('value') or ""
-      terminator_val = line_match.group('terminator') or ""
-
-      line_func = f"{indent_val}{keyword_val} § {type_val} § {packed_val} §§ {name_val}{unpacked_val} § = § {value_val}{terminator_val}"
-    lines[idx] = line_func + line_comm
+      indentation = line_match.group('indent')      or ""
+      keyword     = line_match.group('keyword')
+      signal_type = line_match.group('type')        or ""
+      packing     = line_match.group('packed')      or ""
+      signal_name = line_match.group('name')
+      unpacking   = line_match.group('unpacked')    or ""
+      value       = line_match.group('value')       or ""
+      termination = line_match.group('termination') or ""
+      line_code = f"{indentation}{keyword} § {signal_type} § {packing} §§ {signal_name}{unpacking} § = § {value}{termination}"
+    lines[line_index] = line_code + line_comment
   return align('\n'.join(lines))
 extra_filters['autoformat_parameter_list'] = autoformat_parameter_list
 
@@ -436,7 +431,7 @@ def remove_duplicate_module_ports(content, reverse=False):
   filtered_lines = []
   ports_seen = set()
   for line in lines:
-    line_strip = line.strip()
+    stripped_line = line.strip()
     # If line is not blank and not commented
     if line_strip and not line_strip.startswith('/'):
       # Uses regex_portDefinition_noArray_noComma from previous context
@@ -461,7 +456,7 @@ def remove_duplicate_instance_ports(content, reverse=False):
   filtered_lines = []
   ports_seen = set()
   for line in lines:
-    line_strip = line.strip()
+    stripped_line = line.strip()
     # If line is not blank and not commented
     if line_strip and not line_strip.startswith('/'):
       line_match = regex_portConnection.match(line)
@@ -482,7 +477,7 @@ def exclude_list_module_ports(content, excludeList=[]):
   lines = content.split('\n')
   filtered_lines = []
   for line in lines:
-    line_strip = line.strip()
+    stripped_line = line.strip()
     # If line is not blank and not commented
     if line_strip and not line_strip.startswith('/'):
       line_match = regex_portDefinition_noArray_noComma.match(line)
@@ -499,7 +494,7 @@ def exclude_list_instance_ports(content, excludeList=[]):
   lines = content.split('\n')
   filtered_lines = []
   for line in lines:
-    line_strip = line.strip()
+    stripped_line = line.strip()
     # If line is not blank and not commented
     if line_strip and not line_strip.startswith('/'):
       line_match = regex_portConnection.match(line)
