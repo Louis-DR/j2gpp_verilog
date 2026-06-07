@@ -761,3 +761,76 @@ def include_guard(content, name):
     guard = f"{guard}__"
   return f"`ifndef {guard}\n`define {guard}\n{content}\n`endif // {guard}"
 extra_filters['include_guard'] = include_guard
+
+
+
+# ┌───────────────┐
+# │ Block affix   │
+# └───────────────┘
+
+# Apply affix filter to all declarations in a block (ports, signals, parameters)
+def affix_declarations(content, prefix="", suffix="", case=None, delimiters=" _-", preserve_caps=True, group_caps=True, consider_numbers=True):
+  lines = content.split('\n')
+  for line_index, line in enumerate(lines):
+    if line.lstrip().startswith('/'): continue
+
+    # Check if parameter
+    match = regex_parameterDefinition.match(line)
+    if match:
+      name = match.group('name')
+      new_name = affix(name, prefix, suffix, case, delimiters, preserve_caps, group_caps, consider_numbers)
+      lines[line_index] = line[:match.start('name')] + new_name + line[match.end('name'):]
+      continue
+
+    # Check if port
+    match = regex_portDefinition_noArray_noComma.match(line)
+    if match:
+      name = match.group('name')
+      new_name = affix(name, prefix, suffix, case, delimiters, preserve_caps, group_caps, consider_numbers)
+      lines[line_index] = line[:match.start('name')] + new_name + line[match.end('name'):]
+      continue
+
+    # Check if wire/signal
+    match = regex_wireDefinition_noArray_noComma.match(line)
+    if match:
+      name = match.group('name')
+      new_name = affix(name, prefix, suffix, case, delimiters, preserve_caps, group_caps, consider_numbers)
+      lines[line_index] = line[:match.start('name')] + new_name + line[match.end('name'):]
+      continue
+
+  return '\n'.join(lines)
+extra_filters['affix_declarations'] = affix_declarations
+
+# Apply affix filter to port connections in a block
+def affix_connections(content, prefix="", suffix="", case=None, delimiters=" _-", preserve_caps=True, group_caps=True, consider_numbers=True, affix_port=False, affix_value=True):
+  lines = content.split('\n')
+  for line_index, line in enumerate(lines):
+    if line.lstrip().startswith('/'): continue
+
+    match = regex_portConnection.match(line)
+    if match:
+      port_name  = match.group('port_name')
+      connection = match.group('connection')
+      connection_stripped = connection.strip()
+
+      end_index   = match.end('connection')
+      start_index = match.start('connection')
+
+      tail   = line[end_index:]
+      middle = line[start_index:end_index]
+
+      if affix_value and re.match(r'^[a-zA-Z_]\w*$', connection_stripped):
+        new_connection = affix(connection_stripped, prefix, suffix, case, delimiters, preserve_caps, group_caps, consider_numbers)
+        middle = middle.replace(connection_stripped, new_connection, 1)
+
+      head = line[:start_index]
+
+      if affix_port:
+        new_port_name = affix(port_name, prefix, suffix, case, delimiters, preserve_caps, group_caps, consider_numbers)
+        head = head[:match.start('port_name')] + new_port_name + head[match.end('port_name'):]
+
+      lines[line_index] = head + middle + tail
+      continue
+
+  return '\n'.join(lines)
+extra_filters['affix_connections'] = affix_connections
