@@ -14,7 +14,7 @@
 import re
 from math import ceil, log2
 from j2gpp.utils import throw_error
-from j2gpp.filters import align, camel, pascal, snake, kebab
+from j2gpp.filters import align, restructure, camel, pascal, snake, kebab, affix
 from jinja2.filters import do_indent
 
 
@@ -31,7 +31,7 @@ extra_filters = {}
 # Matches: "input wire [7:0] name" or "output reg name"
 regex_portDefinition_noArray_noComma = re.compile(r"""
   ^(?P<indent>\s*)
-  (?:(?P<dir>input|output|inout|ref)\b\s*)?  # Optional Direction
+  (?:(?P<direction>input|output|inout|ref)\b\s*)?  # Optional Direction
   (?P<type>(?:[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*\s+)*[a-zA-Z_]\w*(?:(?:::|\.)[a-zA-Z_]\w*)*)?  # Optional type (net, interface, struct, etc.)
   \s*
   (?:
@@ -44,7 +44,7 @@ regex_portDefinition_noArray_noComma = re.compile(r"""
 # Instance Port Connection
 # Matches: ".port_name ( connection_expression ),"
 regex_portConnection = re.compile(r"""
-  ^\s*
+  ^(?P<indent>\s*)
   \.(?P<port_name>[a-zA-Z_]\w*)  # Port name
   \s*
   \(
@@ -52,7 +52,7 @@ regex_portConnection = re.compile(r"""
   (?P<connection>.*)             # Connection expression
   \)
   \s*
-  ,?                             # Optional comma
+  (?P<comma>,?)                  # Optional comma
 """, re.VERBOSE)
 
 # Wire/Signal Definition (stopping after name)
@@ -297,6 +297,25 @@ extra_filters['invert_all_if'] = invert_all_if
 # │ Block format │
 # └──────────────┘
 
+# Alignment marker for column-based formatting.
+# Emits a raw alignment marker that column_align() processes.
+COMMENT_COLUMN = 9
+def alignment_marker(justification, column):
+  return f"\x00ALIGN:{justification}:{column}\x00"
+
+
+
+# Split a line into its code portion and inline comment.
+# Returns (code, comment) where comment is "// ..." or empty string.
+# Full-line comments return (None, None) to signal they should be left untouched.
+def split_code_and_comment(line):
+  if line.lstrip().startswith('/'):
+    return None, None
+  parts = line.split('//', 1)
+  code = parts[0].rstrip()
+  comment = '// ' + parts[1].strip() if len(parts) == 2 else ""
+  return code, comment
+
 # Remove the comma at the end of the last non-commented non-empty line
 def remove_last_comma(content):
   lines = content.split('\n')
@@ -308,100 +327,139 @@ def remove_last_comma(content):
   return '\n'.join(lines)
 extra_filters['remove_last_comma'] = remove_last_comma
 
+# Autoformat module port definitions.
+# Column layout:
+#   col 1: direction boundary (left-aligned)
+#   col 2: type/packed boundary — type left-aligns, packed right-aligns (overlap when no packed)
+#   col 3: signal name boundary (left-aligned)
+#   col 9: end-of-line comment (left-aligned)
 def autoformat_module_ports(content, indent=2):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
-    if line.lstrip().startswith('/'):
+    line_code, line_comment = split_code_and_comment(line)
+    if line_code is None or not line_code:
       continue
-    line_split = line.split('//', 1)
-    line_code  = line_split[0].rstrip()
-    if not line_code:
-      continue
-    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_match   = regex_portDefinition_noArray_noComma.match(line_code)
+    line_match = regex_portDefinition_noArray_noComma.match(line_code)
     if line_match:
-      indentation = line_match.group('indent') or ""
-      direction   = line_match.group('dir')
-      signal_type = line_match.group('type')   or ""
-      packing     = line_match.group('packed') or ""
+      indentation = line_match.group('indent')     or ""
+      direction   = line_match.group('direction')
+      signal_type = line_match.group('type')       or ""
+      packing     = line_match.group('packed')     or ""
       signal_name = line_match.group('name')
-      if not direction:
-        direction = signal_type
-        signal_type = ""
-      line_code = f"{indentation}{direction} § {signal_type} § {packing} §§ {signal_name}{line_code[line_match.end('name'):]}"
-    lines[line_index] = line_code + line_comment
-  return align('\n'.join(lines))
+      trailing    = line_code[line_match.end('name'):]
+      line_code = indentation
+      if direction:
+        line_code += direction + alignment_marker("left", 1)
+      if signal_type:
+        line_code += signal_type
+      if packing:
+        line_code += alignment_marker("left", 2) + packing
+        line_code += alignment_marker("right", 3)
+      else:
+        line_code += alignment_marker("left", 3)
+      line_code += signal_name + trailing
+    if line_comment:
+      line_code += alignment_marker("left", COMMENT_COLUMN) + line_comment
+    lines[line_index] = line_code
+  return restructure('\n'.join(lines))
 extra_filters['autoformat_module_ports'] = autoformat_module_ports
 
+# Autoformat module instance port connections.
+# Column layout:
+#   col 1: port name boundary (left-aligned)
+#   col 2: connection expression (left-aligned inside parens)
+#   col 3: closing paren boundary (left-aligned)
+#   col 9: end-of-line comment (left-aligned)
 def autoformat_instance_ports(content, indent=2):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
-    if line.lstrip().startswith('/'):
+    line_code, line_comment = split_code_and_comment(line)
+    if line_code is None or not line_code:
       continue
-    line_split = line.split('//', 1)
-    line_code  = line_split[0].rstrip()
-    if not line_code:
-      continue
-    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
-    line_code = line_code.replace('(', '§(§', 1)
-    closing_paren_index = line_code.rfind(')')
-    if closing_paren_index != -1:
-      line_code = line_code[:closing_paren_index] + ' §)' + line_code[closing_paren_index+1:]
-    lines[line_index] = line_code + line_comment
-  return align('\n'.join(lines))
+    line_match = regex_portConnection.match(line_code)
+    if line_match:
+      indentation = line_match.group('indent')  or ""
+      port_name   = line_match.group('port_name')
+      connection  = line_match.group('connection').strip()
+      comma       = line_match.group('comma')   or ""
+      line_code  = indentation + "." + port_name
+      line_code += alignment_marker("left", 1) + "( " + connection + " "
+      line_code += alignment_marker("left", 3) + ")" + comma
+    if line_comment:
+      line_code += alignment_marker("left", COMMENT_COLUMN) + line_comment
+    lines[line_index] = line_code
+  return restructure('\n'.join(lines))
 extra_filters['autoformat_instance_ports'] = autoformat_instance_ports
 
+# Autoformat wire and signal definitions.
+# Column layout:
+#   col 1: type/packed boundary — type left-aligns, packed right-aligns (overlap when no packed)
+#   col 2: signal name boundary (left-aligned)
+#   col 9: end-of-line comment (left-aligned)
 def autoformat_signal_definitions(content, indent=0):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
-    if line.lstrip().startswith('/'):
+    line_code, line_comment = split_code_and_comment(line)
+    if line_code is None or not line_code:
       continue
-    line_split = line.split('//', 1)
-    line_code = line_split[0].rstrip()
-    if not line_code:
-      continue
-    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
     line_match = regex_wireDefinition_noArray_noComma.match(line_code)
     if line_match:
-      indentation = line_match.group('indent') or ""
-      signal_type = line_match.group('type')   or ""
-      packing     = line_match.group('packed') or ""
+      indentation = line_match.group('indent')  or ""
+      signal_type = line_match.group('type')    or ""
+      packing     = line_match.group('packed')  or ""
       signal_name = line_match.group('name')
-      line_code = f"{indentation}{signal_type} § {packing} §§ {signal_name}{line_code[line_match.end('name'):]}"
-    lines[line_index] = line_code + line_comment
-  return align('\n'.join(lines))
+      trailing    = line_code[line_match.end('name'):]
+      line_code = indentation + signal_type
+      if packing:
+        line_code += alignment_marker("left", 1) + packing
+        line_code += alignment_marker("right", 2)
+      else:
+        line_code += alignment_marker("left", 2)
+      line_code += signal_name + trailing
+    if line_comment:
+      line_code += alignment_marker("left", COMMENT_COLUMN) + line_comment
+    lines[line_index] = line_code
+  return restructure('\n'.join(lines))
 extra_filters['autoformat_signal_definitions'] = autoformat_signal_definitions
 
+# Autoformat assign statements.
+# Column layout:
+#   col 1: left-hand side boundary (left-aligned)
+#   col 2: right-hand side boundary (left-aligned)
+#   col 9: end-of-line comment (left-aligned)
 def autoformat_assign_statements(content, indent=0):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
-    if line.lstrip().startswith('/'):
+    line_code, line_comment = split_code_and_comment(line)
+    if line_code is None or not line_code:
       continue
-    line_split = line.split('//', 1)
-    line_code = line_split[0].rstrip()
-    if not line_code:
-      continue
-    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
     line_match = regex_assignStatement.match(line_code)
     if line_match:
       indentation  = line_match.group('indent')       or ""
       assign_left  = line_match.group('assign_left')  or ""
       assign_right = line_match.group('assign_right') or ""
-      line_code = f"{indentation}assign {assign_left} § = § {assign_right};"
-    lines[line_index] = line_code + line_comment
-  return align('\n'.join(lines))
+      line_code = indentation + "assign " + assign_left
+      line_code += alignment_marker("left", 1) + "= " + alignment_marker("left", 2) + assign_right + ";"
+    if line_comment:
+      line_code += alignment_marker("left", COMMENT_COLUMN) + line_comment
+    lines[line_index] = line_code
+  return restructure('\n'.join(lines))
 extra_filters['autoformat_assign_statements'] = autoformat_assign_statements
 
+# Autoformat parameter definitions.
+# Column layout:
+#   col 1: keyword boundary (left-aligned)
+#   col 2: type/packed boundary — type left-aligns, packed right-aligns (overlap when no packed)
+#   col 3: parameter name boundary (left-aligned)
+#   col 4: equals sign boundary (left-aligned)
+#   col 5: value boundary (left-aligned)
+#   col 9: end-of-line comment (left-aligned)
 def autoformat_parameter_list(content, indent=0, right_align_values=False):
   lines = content.split('\n')
   for line_index, line in enumerate(lines):
-    if line.lstrip().startswith('/'):
+    line_code, line_comment = split_code_and_comment(line)
+    if line_code is None or not line_code:
       continue
-    line_split = line.split('//', 1)
-    line_code = line_split[0].rstrip()
-    if not line_code:
-      continue
-    line_comment = ('§ // ' + line_split[1].strip()) if len(line_split) == 2 else ""
     line_match = regex_parameterDefinition.match(line_code)
     if line_match:
       indentation = line_match.group('indent')      or ""
@@ -412,10 +470,22 @@ def autoformat_parameter_list(content, indent=0, right_align_values=False):
       unpacking   = line_match.group('unpacked')    or ""
       value       = line_match.group('value')       or ""
       termination = line_match.group('termination') or ""
-      line_code = f"{indentation}{keyword} § {signal_type} § {packing} §§ {signal_name}{unpacking} § = § {value}{termination}"
-      if right_align_values: line_code += "§§"
-    lines[line_index] = line_code + line_comment
-  return align('\n'.join(lines))
+      line_code = indentation + keyword + alignment_marker("left", 1)
+      if signal_type:
+        line_code += signal_type
+      if packing:
+        line_code += alignment_marker("left", 2) + packing
+        line_code += alignment_marker("right", 3)
+      else:
+        line_code += alignment_marker("left", 3)
+      line_code += signal_name + unpacking
+      line_code += alignment_marker("left", 4) + "= " + alignment_marker("left", 5) + value + termination
+      if right_align_values:
+        line_code += alignment_marker("right", 6)
+    if line_comment:
+      line_code += alignment_marker("left", COMMENT_COLUMN) + line_comment
+    lines[line_index] = line_code
+  return restructure('\n'.join(lines))
 extra_filters['autoformat_parameter_list'] = autoformat_parameter_list
 
 
